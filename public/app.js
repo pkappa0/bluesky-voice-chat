@@ -16,6 +16,29 @@ let engine;
 let recording;
 let busy = false;
 let realtime;
+const personaFields = { tone: get('tone'), personality: get('personality') };
+const personaKey = 'voice-chat-persona';
+const readPersona = () => Object.fromEntries(
+  Object.entries(personaFields).map(([name, field]) => [name, field.value.trim()]),
+);
+
+try {
+  const saved = JSON.parse(localStorage.getItem(personaKey) ?? '{}');
+  for (const [name, field] of Object.entries(personaFields)) {
+    if (typeof saved?.[name] === 'string') field.value = saved[name].slice(0, 200);
+  }
+} catch {
+  get('persona-status').textContent = '保存済みの設定を読み込めませんでした。';
+}
+
+get('persona').addEventListener('input', () => {
+  try {
+    localStorage.setItem(personaKey, JSON.stringify(readPersona()));
+    get('persona-status').textContent = 'このブラウザに保存しました。';
+  } catch {
+    get('persona-status').textContent = 'このブラウザでは設定を保存できません。現在の画面では使えます。';
+  }
+});
 
 function tell(message, error = false) {
   status.textContent = message;
@@ -128,6 +151,7 @@ async function talk(message, ready) {
   input.value = message;
   tell('返事を考えています…');
   const { reply } = await api('/api/chat', 'application/json', JSON.stringify({
+    persona: readPersona(),
     messages: [...history.slice(-8), { role: 'user', content: message }],
   }));
   addMessage('user', message);
@@ -337,7 +361,9 @@ async function connectRealtime(session) {
     }, 30_000);
     const offer = await peer.createOffer();
     await peer.setLocalDescription(offer);
-    const answer = await api('/api/realtime', 'application/sdp', offer.sdp, session.abort.signal);
+    const answer = await api('/api/realtime', 'application/json', JSON.stringify({
+      sdp: offer.sdp, persona: session.persona,
+    }), session.abort.signal);
     await peer.setRemoteDescription({ type: 'answer', sdp: answer.sdp });
   } catch (error) {
     endRealtime(session, error.name === 'NotAllowedError'
@@ -352,7 +378,7 @@ live.addEventListener('click', () => {
     return;
   }
   if (live.disabled) return;
-  realtime = { ready: unlockAudio(), abort: new AbortController(), transcripts: new Map() };
+  realtime = { ready: unlockAudio(), abort: new AbortController(), transcripts: new Map(), persona: readPersona() };
   tell('マイクとRealtime APIに接続しています…');
   updateControls();
   void connectRealtime(realtime);

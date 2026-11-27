@@ -106,15 +106,32 @@ async function openai(path, body, signal, format = 'json') {
   return format === 'text' ? response.text() : response.json();
 }
 
+function withPersona(instructions, persona) {
+  if (persona === undefined) return instructions;
+  if (!persona || typeof persona !== 'object' || Array.isArray(persona)) {
+    throw new RequestError(400, '口調と性格の設定を確認してください。');
+  }
+  const preferences = [];
+  for (const [key, label] of [['tone', '口調'], ['personality', '性格']]) {
+    const value = persona[key] ?? '';
+    if (typeof value !== 'string' || value.length > 200) {
+      throw new RequestError(400, '口調と性格は各200文字以内で入力してください。');
+    }
+    if (value.trim()) preferences.push(label + '：' + value.trim());
+  }
+  return preferences.length ? instructions + '\n会話スタイルの指定を優先してください。\n' + preferences.join('\n') : instructions;
+}
+
 async function chat(request, type, signal) {
   if (type !== 'application/json') throw new RequestError(415, 'テキストの送信形式が無効です。');
-  let messages;
+  let payload;
   try {
-    messages = JSON.parse(await readBody(request, 32 * 1024))?.messages;
+    payload = JSON.parse(await readBody(request, 48 * 1024));
   } catch (error) {
     if (error instanceof RequestError) throw error;
     throw new RequestError(400, '会話の形式が無効です。');
   }
+  const { messages, persona } = payload ?? {};
   if (!Array.isArray(messages) || !messages.length || messages.length > 9 ||
       messages.length % 2 === 0 || messages.some((item, index) =>
         item?.role !== (index % 2 ? 'assistant' : 'user') ||
@@ -126,7 +143,7 @@ async function chat(request, type, signal) {
     store: false,
     max_completion_tokens: 300,
     messages: [
-      { role: 'system', content: 'あなたは日本語で話す会話相手です。親しみやすく、少し上品な口調で、読み上げやすい自然な日本語を使ってください。装飾記号、絵文字、Markdownを避け、原則3文以内で返してください。' },
+      { role: 'system', content: withPersona('あなたは日本語で話す会話相手です。親しみやすく、少し上品な口調で、読み上げやすい自然な日本語を使ってください。装飾記号、絵文字、Markdownを避け、原則3文以内で返してください。', persona) },
       ...messages.map(({ role, content }) => ({ role, content })),
     ],
   }), signal);
@@ -152,16 +169,23 @@ async function transcribe(request, type, signal) {
 }
 
 async function realtimeCall(request, type, signal) {
-  if (type !== 'application/sdp') throw new RequestError(415, '通話の接続形式が無効です。');
-  const sdp = (await readBody(request, 64 * 1024)).toString('utf8');
-  if (!sdp.startsWith('v=0')) throw new RequestError(400, '通話の接続情報が無効です。');
+  if (type !== 'application/sdp' && type !== 'application/json') {
+    throw new RequestError(415, '通話の接続形式が無効です。');
+  }
+  const body = (await readBody(request, 96 * 1024)).toString('utf8');
+  let payload = { sdp: body };
+  if (type === 'application/json') {
+    try { payload = JSON.parse(body); } catch { throw new RequestError(400, '通話の接続情報が無効です。'); }
+  }
+  const { sdp, persona } = payload ?? {};
+  if (typeof sdp !== 'string' || !sdp.startsWith('v=0')) throw new RequestError(400, '通話の接続情報が無効です。');
   const form = new FormData();
   form.set('sdp', sdp);
   form.set('session', JSON.stringify({
     type: 'realtime',
     model: realtimeModel,
     output_modalities: ['text'],
-    instructions: '日本語で会話してください。少し上品で自然な話し言葉で、原則として短い1〜2文で答えます。Markdownや絵文字は使いません。',
+    instructions: withPersona('日本語で会話してください。少し上品で自然な話し言葉で、原則として短い1〜2文で答えます。Markdownや絵文字は使いません。', persona),
     max_output_tokens: 220,
     audio: { input: {
       transcription: { model: sttModel, language: 'ja' },

@@ -26,3 +26,8 @@ button:disabled { opacity: .55; cursor: default; }
 a { color: #254e77; }
 
 #live { margin-bottom: 16px; }
+
+#persona { margin-top: 18px; }
+#persona summary { cursor: pointer; font-weight: 650; }
+#persona p { font-size: .85rem; color: #465a72; }
+#persona label, #persona p { margin-top: 6px; }
