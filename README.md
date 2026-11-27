@@ -1,4 +1,4 @@
-# 音声対話室
+# Bluesky放送部部室
 
 Mac上で使う日本語の対話アプリです。入力をOpenAI APIで処理し、応答を既存のZEN-TTS v1.4.0で音声にします。ChromeのWebGPUで合成し、Web Audioで再生します。起動後の利用にCodexやWorkは不要です。
 
