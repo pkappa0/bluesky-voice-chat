@@ -177,7 +177,7 @@ async function realtimeCall(request, type, signal) {
   if (type === 'application/json') {
     try { payload = JSON.parse(body); } catch { throw new RequestError(400, '通話の接続情報が無効です。'); }
   }
-  const { sdp, persona } = payload ?? {};
+  const { sdp, persona, manualTurns } = payload ?? {};
   if (typeof sdp !== 'string' || !sdp.startsWith('v=0')) throw new RequestError(400, '通話の接続情報が無効です。');
   const form = new FormData();
   form.set('sdp', sdp);
@@ -191,7 +191,7 @@ async function realtimeCall(request, type, signal) {
       transcription: { model: sttModel, language: 'ja' },
       turn_detection: {
         type: 'server_vad', silence_duration_ms: 600,
-        create_response: true, interrupt_response: false,
+        create_response: manualTurns !== true, interrupt_response: false,
       },
     } },
   }));

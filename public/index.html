@@ -18,6 +18,13 @@
     <p id="empty">メッセージを入力するか、マイクで話しかけてください。</p>
     <p id="status" role="status"></p>
     <button type="button" id="live" disabled>リアルタイム会話を開始</button>
+    <fieldset id="realtime-mode">
+      <legend>リアルタイム会話のモード</legend>
+      <label><input type="radio" name="realtime-mode" value="listen" checked> 相づち</label>
+      <label><input type="radio" name="realtime-mode" value="auto"> 自動回答</label>
+      <button type="button" id="answer" class="quiet" disabled>いまの質問に回答</button>
+      <p>相づちモードでは、話が終わったら回答ボタンを押してください。</p>
+    </fieldset>
     <form>
       <label for="message">メッセージ</label>
       <textarea id="message" required maxlength="1000" rows="2" placeholder="こんにちは。"></textarea>

@@ -5,6 +5,9 @@ const form = document.querySelector('form');
 const input = get('message');
 const mic = get('mic');
 const live = get('live');
+const answerButton = get('answer');
+const realtimeMode = get('realtime-mode');
+const autoAnswer = () => realtimeMode.querySelector(':checked').value === 'auto';
 const status = get('status');
 const log = get('log');
 const history = [];
@@ -13,6 +16,7 @@ const micAvailable = Boolean(navigator.mediaDevices?.getUserMedia && window.Medi
 let config;
 let audio;
 let engine;
+let speechQueue = Promise.resolve();
 let recording;
 let busy = false;
 let realtime;
@@ -50,6 +54,8 @@ function updateControls() {
   live.disabled = !config?.apiReady || !navigator.mediaDevices?.getUserMedia ||
     !window.RTCPeerConnection || (!realtime && occupied);
   live.textContent = realtime ? 'リアルタイム会話を終了' : 'リアルタイム会話を開始';
+  answerButton.disabled = autoAnswer() || !realtime?.connected || realtime.responding ||
+    realtime.answerRequested || !(realtime.speechPending || realtime.unanswered);
   get('sample').disabled = !config || occupied;
   get('send').disabled = !config?.apiReady || occupied;
   get('clear').disabled = occupied || log.childElementCount === 0;
@@ -89,12 +95,18 @@ function unlockAudio() {
   }
 }
 
-async function speak(text, ready, signal) {
+function speak(text, ready, signal, quiet = false) {
+  const result = speechQueue.then(() => playSpeech(text, ready, signal, quiet));
+  speechQueue = result.catch(() => {});
+  return result;
+}
+
+async function playSpeech(text, ready, signal, quiet) {
   if (!await ready) throw new Error('音声を再生できません。ブラウザの音声設定を確認してください。');
   if (!navigator.gpu) throw new Error('WebGPUが利用できません。Mac版Chromeで開いてください。');
   if (signal?.aborted) return;
   if (!engine) {
-    tell('音声モデルを読み込んでいます…');
+    if (!quiet) tell('音声モデルを読み込んでいます…');
     try {
       engine = await ZenTts.load({
         backend: 'webgpu', modelsUrl: '/zen/models',
@@ -106,7 +118,7 @@ async function speak(text, ready, signal) {
     }
   }
   if (signal?.aborted) return;
-  tell('WebGPUで音声を生成・再生中…');
+  if (!quiet) tell('WebGPUで音声を生成・再生中…');
   for await (const { pcm, sampleRate } of engine.speakStream(text)) {
     if (signal?.aborted) return;
     if (!pcm.length) continue;
@@ -126,7 +138,7 @@ async function speak(text, ready, signal) {
       signal?.addEventListener('abort', stop, { once: true });
     });
   }
-  if (!signal?.aborted) tell('再生が終わりました。');
+  if (!quiet && !signal?.aborted) tell('再生が終わりました。');
 }
 
 function addMessage(role, content) {
@@ -249,6 +261,7 @@ function endRealtime(session, message, error = false) {
   if (session !== realtime) return;
   realtime = undefined;
   clearTimeout(session.timer);
+  stopAcknowledgement(session);
   session.abort.abort();
   session.stream?.getTracks().forEach((track) => track.stop());
   session.peer?.close();
@@ -256,11 +269,76 @@ function endRealtime(session, message, error = false) {
   updateControls();
 }
 
+function stopAcknowledgement(session) {
+  clearTimeout(session.ackTimer);
+  session.ackAbort?.abort();
+}
+
+function scheduleAcknowledgement(session, delay = 1000) {
+  session.ackTimer = setTimeout(async () => {
+    if (session !== realtime || !session.speaking || autoAnswer() || session.answerRequested) return;
+    const controller = new AbortController();
+    session.ackAbort = controller;
+    const phrases = ['ええ。', 'はい。', 'うん。'];
+    const text = phrases[(session.ackIndex ?? 0) % phrases.length];
+    try {
+      await speak(text, session.ready, controller.signal, true);
+      if (!controller.signal.aborted) session.ackIndex = (session.ackIndex ?? 0) + 1;
+    } catch (error) {
+      endRealtime(session, error.message, true);
+    }
+    if (!controller.signal.aborted && session.speaking && session === realtime) {
+      scheduleAcknowledgement(session, 6000);
+    }
+  }, delay);
+}
+
 function listenAgain(session) {
   if (session !== realtime) return;
+  session.responding = false;
   session.track.enabled = true;
-  tell('聞いています。話しかけてください。');
+  const message = !autoAnswer() && session.unanswered
+    ? '聞いています。答えてほしいときは「いまの質問に回答」を押してください。'
+    : '聞いています。話しかけてください。';
+  tell(message);
+  updateControls();
 }
+
+function requestRealtimeAnswer(session) {
+  if (!session.connected || session.responding) return;
+  stopAcknowledgement(session);
+  if (session.speechPending) {
+    session.answerRequested = true;
+    tell('話し終わったら回答します。');
+    updateControls();
+    return;
+  }
+  if (!session.unanswered) return;
+  session.answerRequested = false;
+  session.unanswered = false;
+  session.responding = true;
+  session.track.enabled = false;
+  try {
+    session.channel.send(JSON.stringify({ type: 'response.create' }));
+    tell('返事を考えています…');
+    updateControls();
+  } catch {
+    endRealtime(session, '返答をリクエストできませんでした。会話を開始し直してください。', true);
+  }
+}
+
+realtimeMode.addEventListener('change', () => {
+  if (realtime) {
+    stopAcknowledgement(realtime);
+    if (realtime.speaking && !autoAnswer() && !realtime.answerRequested) scheduleAcknowledgement(realtime);
+    if (!realtime.speechPending && !realtime.responding && realtime.connected) listenAgain(realtime);
+  }
+  updateControls();
+});
+
+answerButton.addEventListener('click', () => {
+  if (!answerButton.disabled && realtime) requestRealtimeAnswer(realtime);
+});
 
 async function playRealtimeReply(session, response) {
   if (session.playing) return;
@@ -301,12 +379,26 @@ function realtimeEvent(session, { data }) {
       }
       break;
     case 'input_audio_buffer.speech_started':
-      if (!session.playing) tell('発話を検出しました…');
+      if (session.responding) break;
+      session.speaking = true;
+      session.speechPending = true;
+      if (!autoAnswer()) scheduleAcknowledgement(session);
+      tell('発話を検出しました…');
+      updateControls();
+      break;
+    case 'input_audio_buffer.speech_stopped':
+      session.speaking = false;
+      stopAcknowledgement(session);
       break;
     case 'input_audio_buffer.committed':
-      session.track.enabled = false;
+      session.speaking = false;
+      session.speechPending = false;
+      stopAcknowledgement(session);
       session.transcripts.set(event.item_id, renderMessage('user', '文字起こし中…'));
-      tell('返事を考えています…');
+      if (session.responding) break;
+      session.unanswered = true;
+      if (autoAnswer() || session.answerRequested) requestRealtimeAnswer(session);
+      else listenAgain(session);
       break;
     case 'conversation.item.input_audio_transcription.completed':
     case 'conversation.item.input_audio_transcription.failed': {
@@ -316,6 +408,7 @@ function realtimeEvent(session, { data }) {
       break;
     }
     case 'response.done':
+      if (!session.responding) break;
       if (event.response?.status === 'failed') {
         endRealtime(session, 'Realtime APIの応答生成に失敗しました。利用枠とモデルへのアクセスを確認してください。', true);
       } else if (event.response?.status === 'cancelled') {
@@ -354,6 +447,7 @@ async function connectRealtime(session) {
       }
     };
     const channel = peer.createDataChannel('oai-events');
+    session.channel = channel;
     channel.onmessage = (event) => realtimeEvent(session, event);
     channel.onclose = () => endRealtime(session, '接続が切れました。もう一度開始してください。', true);
     session.timer = setTimeout(() => {
@@ -362,7 +456,7 @@ async function connectRealtime(session) {
     const offer = await peer.createOffer();
     await peer.setLocalDescription(offer);
     const answer = await api('/api/realtime', 'application/json', JSON.stringify({
-      sdp: offer.sdp, persona: session.persona,
+      sdp: offer.sdp, persona: session.persona, manualTurns: true,
     }), session.abort.signal);
     await peer.setRemoteDescription({ type: 'answer', sdp: answer.sdp });
   } catch (error) {

@@ -31,3 +31,8 @@ a { color: #254e77; }
 #persona summary { cursor: pointer; font-weight: 650; }
 #persona p { font-size: .85rem; color: #465a72; }
 #persona label, #persona p { margin-top: 6px; }
+
+#realtime-mode { margin: 0 0 16px; padding: 8px 12px 12px; border: 1px solid #bacde1; border-radius: 10px; }
+#realtime-mode legend { font-size: .86rem; font-weight: 650; }
+#realtime-mode label { display: inline-flex; align-items: center; margin-right: 12px; }
+#realtime-mode p { margin-top: 5px; font-size: .81rem; color: #465a72; }
