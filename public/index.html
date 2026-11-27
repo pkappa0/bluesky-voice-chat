@@ -13,10 +13,20 @@
     <div><h1>音声対話室</h1><p id="voice">声を確認中</p></div>
     <button type="button" class="quiet" id="sample" disabled>声を試す</button>
   </header>
+  <p id="status" role="status"></p>
+  <section aria-label="テキスト読み上げ" class="read-aloud">
+    <form id="read-form">
+      <label for="read-text">読み上げるテキスト</label>
+      <textarea id="read-text" required maxlength="1000" rows="2" placeholder="読ませたい文章を入力してください。"></textarea>
+      <div class="actions">
+        <button type="submit" id="read" disabled>読み上げる</button>
+        <button type="button" id="news" class="quiet" disabled>週刊ブルースカイニュース！</button>
+      </div>
+    </form>
+  </section>
   <section aria-label="会話">
     <ol id="log" role="log" aria-relevant="additions"></ol>
     <p id="empty">メッセージを入力するか、マイクで話しかけてください。</p>
-    <p id="status" role="status"></p>
     <button type="button" id="live" disabled>リアルタイム会話を開始</button>
     <fieldset id="realtime-mode">
       <legend>リアルタイム会話のモード</legend>
@@ -25,7 +35,7 @@
       <button type="button" id="answer" class="quiet" disabled>いまの質問に回答</button>
       <p>相づちモードでは、話が終わったら回答ボタンを押してください。</p>
     </fieldset>
-    <form>
+    <form id="chat-form">
       <label for="message">メッセージ</label>
       <textarea id="message" required maxlength="1000" rows="2" placeholder="こんにちは。"></textarea>
       <div class="actions">

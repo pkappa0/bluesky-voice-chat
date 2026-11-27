@@ -1,7 +1,11 @@
 import { ZenTts, ztmUrl } from '/zen/dist/index.js';
 
 const get = (id) => document.getElementById(id);
-const form = document.querySelector('form');
+const form = get('chat-form');
+const readForm = get('read-form');
+const readText = get('read-text');
+const readButton = get('read');
+const newsButton = get('news');
 const input = get('message');
 const mic = get('mic');
 const live = get('live');
@@ -11,6 +15,7 @@ const autoAnswer = () => realtimeMode.querySelector(':checked').value === 'auto'
 const status = get('status');
 const log = get('log');
 const history = [];
+const newsText = '週刊ブルースカイニュース！';
 const sampleText = 'こんにちは。今日もお話しできてうれしいです。';
 const micAvailable = Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
 let config;
@@ -57,6 +62,9 @@ function updateControls() {
   answerButton.disabled = autoAnswer() || !realtime?.connected || realtime.responding ||
     realtime.answerRequested || !(realtime.speechPending || realtime.unanswered);
   get('sample').disabled = !config || occupied;
+  readText.disabled = occupied;
+  readButton.disabled = !config || occupied || !readText.value.trim();
+  newsButton.disabled = !config || occupied;
   get('send').disabled = !config?.apiReady || occupied;
   get('clear').disabled = occupied || log.childElementCount === 0;
   input.disabled = occupied;
@@ -95,13 +103,13 @@ function unlockAudio() {
   }
 }
 
-function speak(text, ready, signal, quiet = false) {
-  const result = speechQueue.then(() => playSpeech(text, ready, signal, quiet));
+function speak(text, ready, signal, { quiet = false, voiceOptions } = {}) {
+  const result = speechQueue.then(() => playSpeech(text, ready, signal, quiet, voiceOptions));
   speechQueue = result.catch(() => {});
   return result;
 }
 
-async function playSpeech(text, ready, signal, quiet) {
+async function playSpeech(text, ready, signal, quiet, voiceOptions) {
   if (!await ready) throw new Error('音声を再生できません。ブラウザの音声設定を確認してください。');
   if (!navigator.gpu) throw new Error('WebGPUが利用できません。Mac版Chromeで開いてください。');
   if (signal?.aborted) return;
@@ -119,7 +127,7 @@ async function playSpeech(text, ready, signal, quiet) {
   }
   if (signal?.aborted) return;
   if (!quiet) tell('WebGPUで音声を生成・再生中…');
-  for await (const { pcm, sampleRate } of engine.speakStream(text)) {
+  for await (const { pcm, sampleRate } of engine.speakStream(text, voiceOptions)) {
     if (signal?.aborted) return;
     if (!pcm.length) continue;
     const buffer = audio.createBuffer(1, pcm.length, sampleRate);
@@ -171,6 +179,22 @@ async function talk(message, ready) {
   input.value = '';
   await speak(reply, ready);
 }
+
+readText.addEventListener('input', updateControls);
+readForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  if (readButton.disabled) return;
+  const text = readText.value.trim();
+  const ready = unlockAudio();
+  void action(() => speak(text, ready));
+});
+newsButton.addEventListener('click', () => {
+  if (newsButton.disabled) return;
+  const ready = unlockAudio();
+  void action(() => speak(newsText, ready, undefined, {
+    voiceOptions: { emotion: { happy: 100 }, speed: 1.12 },
+  }));
+});
 
 get('sample').addEventListener('click', () => {
   const ready = unlockAudio();
@@ -282,7 +306,7 @@ function scheduleAcknowledgement(session, delay = 1000) {
     const phrases = ['ええ。', 'はい。', 'うん。'];
     const text = phrases[(session.ackIndex ?? 0) % phrases.length];
     try {
-      await speak(text, session.ready, controller.signal, true);
+      await speak(text, session.ready, controller.signal, { quiet: true });
       if (!controller.signal.aborted) session.ackIndex = (session.ackIndex ?? 0) + 1;
     } catch (error) {
       endRealtime(session, error.message, true);

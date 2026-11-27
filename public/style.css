@@ -36,3 +36,6 @@ a { color: #254e77; }
 #realtime-mode legend { font-size: .86rem; font-weight: 650; }
 #realtime-mode label { display: inline-flex; align-items: center; margin-right: 12px; }
 #realtime-mode p { margin-top: 5px; font-size: .81rem; color: #465a72; }
+
+.read-aloud { margin-top: 0; }
+.read-aloud .actions { flex-wrap: wrap; justify-content: flex-start; }
