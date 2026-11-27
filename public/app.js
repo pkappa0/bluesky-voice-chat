@@ -192,7 +192,7 @@ newsButton.addEventListener('click', () => {
   if (newsButton.disabled) return;
   const ready = unlockAudio();
   void action(() => speak(newsText, ready, undefined, {
-    voiceOptions: { emotion: { happy: 100 }, speed: 1.12 },
+    voiceOptions: { emotion: { happy: 100 }, speed: 0.92 },
   }));
 });
 
