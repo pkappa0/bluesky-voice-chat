@@ -1,0 +1,4 @@
+.env
+.env.*
+*.ztm
+.DS_Store

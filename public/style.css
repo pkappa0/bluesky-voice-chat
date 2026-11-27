@@ -1,0 +1,28 @@
+:root { color-scheme: light; font: 16px/1.65 -apple-system, BlinkMacSystemFont, sans-serif; color: #182c48; background: #edf4fa; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 760px; margin: 7vh auto 0; padding: 0 20px 28px; }
+header, .actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+h1 { margin: 0; font-size: clamp(1.8rem, 5vw, 2.7rem); letter-spacing: -.04em; }
+p { margin: 0; }
+#voice, #empty, .privacy, footer { color: #465a72; }
+section { margin-top: 20px; border: 1px solid #c9dbea; border-radius: 22px; background: #fff; padding: clamp(16px, 4vw, 28px); }
+#log { list-style: none; padding: 0; margin: 0; max-height: 48vh; overflow: auto; }
+#log li { margin-bottom: 12px; padding: 12px 16px; border-radius: 14px; background: #eaf3ff; white-space: pre-wrap; overflow-wrap: anywhere; }
+#log li[data-role="user"] { background: #f1f4f7; margin-left: 12%; }
+#log li[data-role="assistant"] { margin-right: 12%; }
+#log strong { display: block; font-size: .8rem; }
+#status { min-height: 1.65em; margin: 12px 0; color: #274d79; }
+#status[data-error] { color: #a32936; }
+label { display: block; font-size: .86rem; font-weight: 650; }
+textarea { width: 100%; resize: vertical; border: 1px solid #829ab3; border-radius: 11px; padding: 10px 12px; color: inherit; font: inherit; }
+button { border: 1px solid transparent; border-radius: 10px; background: #245fa8; color: white; font: inherit; font-weight: 650; cursor: pointer; padding: 7px 14px; }
+button.quiet { background: #f4f8fc; border-color: #bacde1; color: #234567; }
+button:disabled { opacity: .55; cursor: default; }
+:focus-visible { outline: 2px solid #245fa8; outline-offset: 3px; }
+.actions { margin-top: 8px; }
+.privacy, footer { margin-top: 14px; font-size: .81rem; }
+#clear { margin-top: 15px; font-size: .84rem; }
+a { color: #254e77; }
+
+#live { margin-bottom: 16px; }

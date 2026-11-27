@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>音声対話室</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+<main>
+  <header>
+    <div><h1>音声対話室</h1><p id="voice">声を確認中</p></div>
+    <button type="button" class="quiet" id="sample" disabled>声を試す</button>
+  </header>
+  <section aria-label="会話">
+    <ol id="log" role="log" aria-relevant="additions"></ol>
+    <p id="empty">メッセージを入力するか、マイクで話しかけてください。</p>
+    <p id="status" role="status"></p>
+    <button type="button" id="live" disabled>リアルタイム会話を開始</button>
+    <form>
+      <label for="message">メッセージ</label>
+      <textarea id="message" required maxlength="1000" rows="2" placeholder="こんにちは。"></textarea>
+      <div class="actions">
+        <button type="button" class="quiet" id="mic" disabled>録音する</button>
+        <button type="submit" id="send" disabled>送信</button>
+      </div>
+    </form>
+    <p class="privacy">リアルタイム会話中はマイク音声をOpenAIに送信します。録音モードでは停止時に送信します。読み上げはこのMacで行います。</p>
+    <button type="button" class="quiet" id="clear" disabled>会話を消去</button>
+  </section>
+  <footer>
+    <p>音声合成：ZEN-TTS（<a href="https://zenryokukikai.com">https://zenryokukikai.com</a>）</p>
+    <p><a href="/zen/license">ZEN-TTS ライセンス</a> · <a href="/zen/notices">第三者のライセンス</a> <span id="credit" hidden>· <a href="https://github.com/kojira/zen-tts-models">音声モデル：Blueskyちゃん / kojira</a></span></p>
+  </footer>
+</main>
+</body>
+</html>
